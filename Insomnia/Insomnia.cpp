@@ -202,30 +202,48 @@ void Insomnia::states_changed() {
 //    if (battery_percent_remaining() >= bat_threshold || cpu_temp < temp_threshold) {
 
     if (lidsleep == 1) {
-        disable_lid_sleep();
+        _lid_sleep_disabled = true;
     } else if (lidsleep == 0) {
-        enable_lid_sleep();
+        _lid_sleep_disabled = false;
     } else {
         if ((is_on_AC() && ac_state) || (!is_on_AC() && battery_state))
-            disable_lid_sleep();
+            _lid_sleep_disabled = true;
         else
-            enable_lid_sleep();
+            _lid_sleep_disabled = false;
     }
 
 //    if (idlesleep == 1) {
-//        disable_idle_sleep();
+//        _idle_sleep_disabled = true;
 //    } else if (idlesleep == 0) {
-//        enable_idle_sleep();
+//        _idle_sleep_disabled = false;
 //    } else {
 //        if ((is_on_AC() && ac_idle_state) || (!is_on_AC() && battery_idle_state))
-//            disable_idle_sleep();
+//            _idle_sleep_disabled = true;
 //        else
-//            enable_idle_sleep();
+//            _idle_sleep_disabled = false;
 //    }
 
 //    } else {
-//        disable_lid_sleep();
+//        _lid_sleep_disabled = true;
+//        _idle_sleep_disabled = true;
+//    }
+
+    if (_lid_sleep_disabled) {
+        disable_lid_sleep();
+    } else {
+        enable_lid_sleep();
+        if (!_last_lid_state) {
+            DLog("Sleeping because lid was already closed and now we don't want to be awake\n"
+                 "Probably because we got unplugged or the battery dropped too low or the CPU"
+                 " got too hot");
+            send_event(kIOPMSleepNow);
+        }
+    }
+
+//    if (_idle_sleep_disabled) {
 //        disable_idle_sleep();
+//    } else {
+//        enable_idle_sleep();
 //    }
 }
 
@@ -306,8 +324,8 @@ void Insomnia::enable_lid_sleep()   { send_event(kIOPMEnableClamshell);  }
 void Insomnia::enable_idle_sleep()  { send_event(kIOPMAllowSleep);       }
 
 void Insomnia::clamshell_state_changed(bool state) {
-    _last_lid_state = state;
     states_changed();
+    _last_lid_state = state;
 }
 
 # pragma mark - Power Management
