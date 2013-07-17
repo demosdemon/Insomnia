@@ -27,6 +27,7 @@
  */
 
 #include <IOKit/IOService.h>
+#include <IOKit/pwr_mgt/IOPMPowerSource.h>
 
 #include <IOKit/IOWorkLoop.h>
 #include <IOKit/IOTimerEventSource.h>
@@ -34,22 +35,56 @@
 
 class Insomnia : public IOService {
     OSDeclareDefaultStructors(Insomnia);
-    
+
 public:
-    // driver startup and shutdown
     virtual bool init(OSDictionary * = 0);
+    virtual void free();
+    
     virtual bool start(IOService* provider);
     virtual void stop(IOService* provider);
-    virtual void free();
+
     virtual IOReturn message(UInt32 type, IOService *provider, void *argument = 0);
     virtual IOWorkLoop* getWorkLoop();
-    virtual bool send_event(UInt32 msg);
+
+    bool send_event(UInt32 msg);
+
+    void states_changed();
+
+protected:
+    void disable_lid_sleep();
+    void disable_idle_sleep();
+
+    void enable_lid_sleep();
+    void enable_idle_sleep();
+
+    void clamshell_state_changed(bool state);
+
+    bool power_source_published(IOService * newService, IONotifier * notifier);
+	IOReturn power_source_state_changed(UInt32 messageType, IOService * provider,
+                                        void * messageArgument, vm_size_t argSize);
     
 private:
-    
-    //UInt32                counter;
-    bool                lastLidState;
-    
-    //IOWorkLoop*            myWorkLoop;
-    IOWorkLoop*         _workLoop;
+    bool        _idle_sleep_disabled;
+    bool        _lid_sleep_disabled;
+    bool        _last_lid_state;
+    IOWorkLoop* _work_loop;
+
+    IONotifier *_power_state_notifier;
+	IOPMPowerSource *_power_source;
+
+	bool is_on_AC();
+    int battery_percent_remaining();
+
+	void startPM(IOService *provider);
+	void stopPM();
+
+    static bool _power_source_published(void * target, void * refCon,
+                                        IOService * newService, IONotifier * notifier);
+
+    static IOReturn _power_source_state_changed(void * target, void * refCon,
+                                                UInt32 messageType, IOService * provider,
+                                                void * messageArgument, vm_size_t argSize);
+
+    virtual IOReturn setPowerState(unsigned long whichState, IOService * whatDevice);
+
 };

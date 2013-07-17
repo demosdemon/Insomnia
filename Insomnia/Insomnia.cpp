@@ -30,7 +30,6 @@
 #include <IOKit/pwr_mgt/RootDomain.h>
 #include <sys/kern_control.h>
 
-
 #include <mach/mach_types.h>
 #include <sys/systm.h>
 #include <mach/mach_types.h>
@@ -53,58 +52,76 @@
 #define CTLFLAG_ANYBODY_RW_NODE (CTLFLAG_ANYBODY|CTLFLAG_RW|CTLTYPE_NODE)
 #define CTLFLAG_ANYBODY_RW_INT (CTLFLAG_ANYBODY|CTLFLAG_RW|CTLTYPE_INT)
 
-#define INSOMNIA_SYSCTL_INT(name, desc) \
+#define INSOMNIA_SYSCTL_INT(name, desc, default, minval, maxval) \
+    static int name = default; \
+\
+    static int sysctl_##name SYSCTL_HANDLER_ARGS; \
+\
     SYSCTL_PROC(_kern_insomnia, \
                 OID_AUTO, \
                 name, \
                 CTLFLAG_ANYBODY_RW_INT, \
                 &name, 0, \
                 &sysctl_##name, \
-                "I", desc)
+                "I", desc); \
+\
+    static int sysctl_##name SYSCTL_HANDLER_ARGS { \
+        int error = sysctl_handle_int(oidp, oidp->oid_arg1, oidp->oid_arg2, req); \
+\
+        if (name < minval || name > maxval) \
+        return 1; \
+\
+        if (!error && req->newptr) { \
+            myinstance->states_changed(); \
+        } else if (req->newptr) { \
+            DLog("error with write"); \
+        } else { \
+\
+            SYSCTL_OUT(req, &name, sizeof(name)); \
+        } \
+\
+        return error; \
+    }
 
 #define super IOService
 
-static int sysctl_lidsleep SYSCTL_HANDLER_ARGS;
-static int sysctl_ac_state SYSCTL_HANDLER_ARGS;
-static int sysctl_battery_state SYSCTL_HANDLER_ARGS;
-static int sysctl_debug SYSCTL_HANDLER_ARGS;
 void sysctl_register();
 void sysctl_unregister();
 
-static unsigned int lidvar = 1;
-static unsigned int origstate = lidvar;
-
-static unsigned int lidsleep = -1;
-static unsigned int ac_state = 1;
-static unsigned int battery_state = 0;
-
-static unsigned int debug = 1;
+#if DEBUG
+    static int debug = 1;
+#else
+    static int debug = 0;
+#endif
 
 #define DLog(fmt, ...) IOLog("%s:%d " fmt "\n", __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__)
 #if DEBUG
-#define Log DLog
+#   define Log DLog
 #else
-#define Log(fmt, ...) do { if (debug) DLog(fmt, ##__VA_ARGS__); } while(0)
+#   define Log(fmt, ...) do { if (debug) DLog(fmt, ##__VA_ARGS__); } while(0)
 #endif
-
-SYSCTL_DECL(_kern_insomnia);
-SYSCTL_NODE(_kern, OID_AUTO, insomnia, CTLFLAG_RW, 0, "Insomnia Settings");
-
-INSOMNIA_SYSCTL_INT(lidsleep, "Override power states");
-INSOMNIA_SYSCTL_INT(ac_state, "Lid sleep for AC");
-INSOMNIA_SYSCTL_INT(battery_state, "Lid sleep for battery");
-INSOMNIA_SYSCTL_INT(debug, "");
-
 
 struct kern_ctl_reg ep_ctl; // Initialize control
 kern_ctl_ref kctlref;
 class Insomnia *myinstance;
 
+#pragma mark - Sysctl Insomnia Settings
+// After changing this list, make sure to update sysctl_register and sysctl_unregister!
+
+SYSCTL_DECL(_kern_insomnia);
+SYSCTL_NODE(_kern, OID_AUTO, insomnia, CTLFLAG_RW, 0, "Insomnia Settings");
+
+INSOMNIA_SYSCTL_INT(lidsleep, "Override power states", -1, -1, 1);
+INSOMNIA_SYSCTL_INT(ac_state, "Lid sleep for AC", 1, 0, 1);
+INSOMNIA_SYSCTL_INT(battery_state, "Lid sleep for battery", 0, 0, 1);
+
+// debug is just a regular sysctl managed int... we don't need to be notified when it changes
+SYSCTL_INT(_kern_insomnia, OID_AUTO, debug, (CTLFLAG_ANYBODY|CTLFLAG_RW), &debug, debug, "");
+
+#pragma mark - Init and Free
+
 OSDefineMetaClassAndStructors(Insomnia, IOService);
 
-#pragma mark -
-
-/* init function for Insomnia, unchanged from orginal Insomnia */
 bool Insomnia::init(OSDictionary* properties) {
     DLog("");
     
@@ -112,76 +129,105 @@ bool Insomnia::init(OSDictionary* properties) {
         DLog("super::init failed");
         return false;
     }
-    
+
     myinstance = this;
+
+    sysctl_register();
 
     return true;
 }
 
+void Insomnia::free() {
+    Log("");
 
-/* start function for Insomnia, fixed send_event to match other code */
+    sysctl_unregister();
+    
+    super::free();
+}
+
+IOWorkLoop* Insomnia::getWorkLoop() {
+    if (!_work_loop)
+        _work_loop = IOWorkLoop::workLoop();
+    
+    return _work_loop;
+}
+
+# pragma mark - Start and Stop
+
 bool Insomnia::start(IOService* provider) {
-    
     DLog("");
-    
-    lastLidState = true;
-    
+
     if (!super::start(provider)) {
         DLog("super::start failed");
         return false;
     }
-    
-    sysctl_register();
-    
+
+    _last_lid_state = true; // Technically it could be closed...
+
+    startPM(provider);
+
     Insomnia::send_event(kIOPMDisableClamshell);// | kIOPMPreventSleep);
-    
+
     return true;
 }
 
-
-/* free function for Insomnia, fixed send_event to match other code */
-void Insomnia::free() {
-    IOPMrootDomain *root = NULL;
-    
-    root = getPMRootDomain();
-    
-    if (!root) {
-        DLog("Fatal error could not get RootDomain.");
-        return;
-    }
-    
-    /* Reset the system to orginal state */
-    Insomnia::send_event(kIOPMAllowSleep | kIOPMEnableClamshell);
-    
-    
-    DLog("Lid close is now processed again.");
-    
-    super::free();
-    return;
-}
-
-// ###########################################################################
-
-IOWorkLoop* Insomnia::getWorkLoop() {
-    if (!_workLoop)
-        _workLoop = IOWorkLoop::workLoop();
-    
-    return _workLoop;
-}
-
-// ###########################################################################
 void Insomnia::stop(IOService* provider) {
-    if (_workLoop) {
-        _workLoop->release();
-        _workLoop = 0;
+    DLog("");
+
+    if (_work_loop) {
+        _work_loop->release();
+        _work_loop = 0;
     }
-    
-    sysctl_unregister();
-    
+
+    /* Reset the system to orginal state */
+    stopPM();
+    enable_lid_sleep();
+    enable_idle_sleep();
+
     super::stop(provider);
 }
 
-#pragma mark -
+#pragma mark - Instance operations
+
+void Insomnia::states_changed() {
+    Log("\n"
+        "lidsleep == %d\n"
+        "ac_state == %d\n"
+        "battery_state == %d\n"
+        "battery_percent_remaining() == %d\n"
+        "is_on_AC() == %s",
+        lidsleep, ac_state, battery_state, battery_percent_remaining(),
+        is_on_AC() ? "true" : "false");
+
+//    if (battery_percent_remaining() >= bat_threshold || cpu_temp < temp_threshold) {
+
+    if (lidsleep == 1) {
+        disable_lid_sleep();
+    } else if (lidsleep == 0) {
+        enable_lid_sleep();
+    } else {
+        if ((is_on_AC() && ac_state) || (!is_on_AC() && battery_state))
+            disable_lid_sleep();
+        else
+            enable_lid_sleep();
+    }
+
+//    if (idlesleep == 1) {
+//        disable_idle_sleep();
+//    } else if (idlesleep == 0) {
+//        enable_idle_sleep();
+//    } else {
+//        if ((is_on_AC() && ac_idle_state) || (!is_on_AC() && battery_idle_state))
+//            disable_idle_sleep();
+//        else
+//            enable_idle_sleep();
+//    }
+
+//    } else {
+//        disable_lid_sleep();
+//        disable_idle_sleep();
+//    }
+}
 
 /* Send power messages to rootDomain */
 bool Insomnia::send_event(UInt32 msg) {
@@ -195,8 +241,7 @@ bool Insomnia::send_event(UInt32 msg) {
         DLog("Fatal error could not get RootDomain.");
         return false;
     }
-    
-    
+
     ret = root->receivePowerNotification(msg);
     
     Log("root returns %d", ret);
@@ -216,41 +261,163 @@ bool Insomnia::send_event(UInt32 msg) {
 IOReturn Insomnia::message(UInt32 type, IOService * provider, void * argument) {
     
     if (type == kIOPMMessageClamshellStateChange) {
-        Log("========================");
-        Log("Clamshell State Changed");
-        
-        /* If lid was opened */
-        if ( ( argument && kClamshellStateBit) & (!lastLidState)) {
-            Log("kClamshellStateBit set - lid was opened");
-            lastLidState = true;
-            
-            Insomnia::send_event( kIOPMClamshellOpened);
-            
-            /* If lastLidState is true - lid closed */
-        } else if (lastLidState) {
-            Log("kClamshellStateBit not set - lid was closed");
-            lastLidState = false;
-            
-            // - send kIOPMDisableClamshell | kIOPMPreventSleep here?
-            if(origstate==1)
-                Insomnia::send_event(kIOPMDisableClamshell | kIOPMPreventSleep);
-        }
-        
-        /*        detection of system sleep probably not needed ...
-         
-        if ( argument && kClamshellSleepBit) {
-            Log("kClamshellSleepBit set - now awake");
-        } else {
-            Log("kClamshellSleepBit not set - now sleeping");
-        }
-        */
-        
+        bool state = (((long)argument) & kClamshellStateBit);
+        clamshell_state_changed(state);
+
+        if (state) // Opened... be a good citizen and let everyone know
+            send_event(kIOPMClamshellOpened);
+        // You know, I'm not even sure if this is necessary...
+        // I think it causes a weird dispatch loop
+//        
+//        /* If lid was opened */
+//        if ( ( argument && kClamshellStateBit) & (!lastLidState)) {
+//            Log("kClamshellStateBit set - lid was opened");
+//            lastLidState = true;
+//            
+//            Insomnia::send_event( kIOPMClamshellOpened);
+//            
+//            /* If lastLidState is true - lid closed */
+//        } else if (lastLidState) {
+//            Log("kClamshellStateBit not set - lid was closed");
+//            lastLidState = false;
+//            
+//            // - send kIOPMDisableClamshell | kIOPMPreventSleep here?
+//            if(origstate==1)
+//                Insomnia::send_event(kIOPMDisableClamshell | kIOPMPreventSleep);
+//        }
+//        
+//        /*        detection of system sleep probably not needed ...
+//         
+//        if ( argument && kClamshellSleepBit) {
+//            Log("kClamshellSleepBit set - now awake");
+//        } else {
+//            Log("kClamshellSleepBit not set - now sleeping");
+//        }
+//        */
+//        
     }
     
     return super::message(type, provider, argument);
 }
 
-// ###########################################################################
+void Insomnia::disable_lid_sleep()  { send_event(kIOPMDisableClamshell); }
+void Insomnia::disable_idle_sleep() { send_event(kIOPMPreventSleep);     }
+void Insomnia::enable_lid_sleep()   { send_event(kIOPMEnableClamshell);  }
+void Insomnia::enable_idle_sleep()  { send_event(kIOPMAllowSleep);       }
+
+void Insomnia::clamshell_state_changed(bool state) {
+    _last_lid_state = state;
+    states_changed();
+}
+
+# pragma mark - Power Management
+
+void Insomnia::startPM(IOService *provider)
+{
+	static const int kMyNumberOfStates = 2;
+	static IOPMPowerState myPowerStates[kMyNumberOfStates] = {
+		{kIOPMPowerStateVersion1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{kIOPMPowerStateVersion1, kIOPMPowerOn, kIOPMPowerOn, kIOPMPowerOn, 0, 0, 0, 0, 0, 0, 0, 0}
+	};
+
+	PMinit();
+	provider->joinPMtree(this);
+	registerPowerDriver(this, myPowerStates, kMyNumberOfStates);
+
+	if (OSDictionary *tmpDict = serviceMatching("IOPMPowerSource"))
+	{
+		addMatchingNotification(gIOFirstPublishNotification, tmpDict,
+                                &Insomnia::_power_source_published, this);
+
+		tmpDict->release();
+	}
+}
+
+void Insomnia::stopPM()
+{
+    if (_power_source) {
+        _power_source->release();
+        _power_source = NULL;
+    }
+
+    if (_power_state_notifier) {
+        _power_state_notifier->remove();
+        _power_state_notifier = NULL;
+    }
+
+	PMstop();
+}
+
+bool Insomnia::power_source_published(IOService *newService, IONotifier *notifier) {
+    if (_power_source)
+        _power_source->release();
+
+    _power_source = (IOPMPowerSource *)newService;
+    _power_source->retain();
+
+    if (_power_state_notifier)
+        _power_state_notifier->remove();
+
+    _power_state_notifier = _power_source->registerInterest(gIOGeneralInterest, Insomnia::_power_source_state_changed, this); // auto-retained
+
+    states_changed();
+
+    return true;
+}
+
+IOReturn Insomnia::power_source_state_changed(UInt32 messageType,
+                                              __unused IOService *provider,
+                                              __unused void *messageArgument,
+                                              __unused vm_size_t argSize)
+{
+    states_changed();
+    // Don't filter because we're interested in usage updates and source changes
+    return kIOPMAckImplied;
+}
+
+bool Insomnia::is_on_AC() {
+    if (_power_source) {
+        return _power_source->externalChargeCapable();
+    }
+
+    return false; // Assume battery until we know for sure
+}
+
+int Insomnia::battery_percent_remaining() {
+    if (_power_source) {
+        unsigned int current = _power_source->currentCapacity();
+        unsigned int max     = _power_source->maxCapacity();
+
+        int percent = (int)((((float)current)/((float)max)) * 100);
+
+        if (percent < 0 || percent > 100)
+            percent = -1;
+        
+        return percent;
+    }
+
+    return -1;
+}
+
+bool Insomnia::_power_source_published(void *target, __unused void *refCon,
+                                       IOService *newService, IONotifier *notifier) {
+    return ((Insomnia*)target)->power_source_published(newService, notifier);
+}
+
+IOReturn Insomnia::_power_source_state_changed(void *target, __unused void *refCon,
+                                               UInt32 messageType, IOService *provider,
+                                               void *messageArgument, vm_size_t argSize) {
+    return ((Insomnia*)target)->power_source_state_changed(messageType, provider,
+                                                           messageArgument, argSize);
+}
+
+IOReturn Insomnia::setPowerState(__unused unsigned long whichState,
+                                 __unused IOService * whatDevice) {
+    states_changed();
+    return IOPMAckImplied;
+}
+
+# pragma mark - sysctl setup
 
 void sysctl_register() {
     sysctl_register_oid(&sysctl__kern_insomnia);
@@ -266,44 +433,4 @@ void sysctl_unregister() {
     sysctl_unregister_oid(&sysctl__kern_insomnia_ac_state);
     sysctl_unregister_oid(&sysctl__kern_insomnia_lidsleep);
     sysctl_unregister_oid(&sysctl__kern_insomnia);
-}
-
-static int sysctl_lidsleep SYSCTL_HANDLER_ARGS {
-    int error;
-    
-    error = sysctl_handle_int(oidp, oidp->oid_arg1, oidp->oid_arg2,  req);
-    
-    if(lidvar!=1 && lidvar!=0)
-        return 1;
-    
-    if (!error && req->newptr) {//we get value
-        if(lidvar != origstate) {
-            /*
-            if(lidvar)//activate
-                myinstance->send_event(kIOPMDisableClamshell | kIOPMPreventSleep);
-                if(!lidvar)//deactivate
-                    myinstance->send_event(kIOPMAllowSleep | kIOPMEnableClamshell);
-            */
-            origstate = lidvar;
-        }
-    } else if (req->newptr) {
-        /* Something was wrong with the write request */
-    } else {
-        /* Read request.  */
-        SYSCTL_OUT(req, &lidvar, sizeof(lidvar));
-    }
-    
-    return error;
-}
-
-static int sysctl_ac_state SYSCTL_HANDLER_ARGS {
-    
-}
-
-static int sysctl_battery_state SYSCTL_HANDLER_ARGS {
-    
-}
-
-static int sysctl_debug SYSCTL_HANDLER_ARGS {
-    
 }
