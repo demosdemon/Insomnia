@@ -60,7 +60,7 @@ protected:
     void clamshell_state_changed(bool state);
 
     bool power_source_published(IOService * newService, IONotifier * notifier);
-	IOReturn power_source_state_changed(UInt32 messageType, IOService * provider,
+    IOReturn power_source_state_changed(UInt32 messageType, IOService * provider,
                                         void * messageArgument, vm_size_t argSize);
     
 private:
@@ -70,13 +70,13 @@ private:
     IOWorkLoop* _work_loop;
 
     IONotifier *_power_state_notifier;
-	IOPMPowerSource *_power_source;
+    IOPMPowerSource *_power_source;
 
-	bool is_on_AC();
+    bool is_on_AC();
     int battery_percent_remaining();
 
-	void startPM(IOService *provider);
-	void stopPM();
+    void startPM(IOService *provider);
+    void stopPM();
 
     static bool _power_source_published(void * target, void * refCon,
                                         IOService * newService, IONotifier * notifier);

@@ -332,23 +332,23 @@ void Insomnia::clamshell_state_changed(bool state) {
 
 void Insomnia::startPM(IOService *provider)
 {
-	static const int kMyNumberOfStates = 2;
-	static IOPMPowerState myPowerStates[kMyNumberOfStates] = {
-		{kIOPMPowerStateVersion1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		{kIOPMPowerStateVersion1, kIOPMPowerOn, kIOPMPowerOn, kIOPMPowerOn, 0, 0, 0, 0, 0, 0, 0, 0}
-	};
+    static const int kMyNumberOfStates = 2;
+    static IOPMPowerState myPowerStates[kMyNumberOfStates] = {
+        {kIOPMPowerStateVersion1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {kIOPMPowerStateVersion1, kIOPMPowerOn, kIOPMPowerOn, kIOPMPowerOn, 0, 0, 0, 0, 0, 0, 0, 0}
+    };
 
-	PMinit();
-	provider->joinPMtree(this);
-	registerPowerDriver(this, myPowerStates, kMyNumberOfStates);
+    PMinit();
+    provider->joinPMtree(this);
+    registerPowerDriver(this, myPowerStates, kMyNumberOfStates);
 
-	if (OSDictionary *tmpDict = serviceMatching("IOPMPowerSource"))
-	{
-		addMatchingNotification(gIOFirstPublishNotification, tmpDict,
+    if (OSDictionary *tmpDict = serviceMatching("IOPMPowerSource"))
+    {
+        addMatchingNotification(gIOFirstPublishNotification, tmpDict,
                                 &Insomnia::_power_source_published, this);
 
-		tmpDict->release();
-	}
+        tmpDict->release();
+    }
 }
 
 void Insomnia::stopPM()
@@ -363,7 +363,7 @@ void Insomnia::stopPM()
         _power_state_notifier = NULL;
     }
 
-	PMstop();
+    PMstop();
 }
 
 bool Insomnia::power_source_published(IOService *newService, IONotifier *notifier) {
