@@ -5,11 +5,11 @@
     Description: Insomnia is a kext module to disable sleep on ClamshellClosed
  
     Copyright (C) 2009 Michael Roßberg, Alexey Manannikov, Dominik Wickenhauser, Andrew James
-    <https://code.google.com/p/insomnia-kext/>
+        <https://code.google.com/p/insomnia-kext/>
     Copyright (C) 2013 François Lamboley
-    <https://github.com/Frizlab/Insomnia>
+        <https://github.com/Frizlab/Insomnia>
     Copyright (C) 2013 Joachim B. LeBlanc
-    <https://github.com/demosdemon/Insomnia>
+        <https://github.com/demosdemon/Insomnia>
  
     Insomnia is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
