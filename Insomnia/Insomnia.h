@@ -33,23 +33,23 @@
 
 
 class Insomnia : public IOService {
-	OSDeclareDefaultStructors(Insomnia);
-	
+    OSDeclareDefaultStructors(Insomnia);
+    
 public:
-	// driver startup and shutdown
-	virtual bool init(OSDictionary * = 0);
-	virtual bool start(IOService* provider);
-	virtual void stop(IOService* provider);
-	virtual void free();
-	virtual IOReturn message(UInt32 type, IOService *provider, void *argument = 0);
-	virtual IOWorkLoop* getWorkLoop();
-	virtual bool send_event(UInt32 msg);
-	
+    // driver startup and shutdown
+    virtual bool init(OSDictionary * = 0);
+    virtual bool start(IOService* provider);
+    virtual void stop(IOService* provider);
+    virtual void free();
+    virtual IOReturn message(UInt32 type, IOService *provider, void *argument = 0);
+    virtual IOWorkLoop* getWorkLoop();
+    virtual bool send_event(UInt32 msg);
+    
 private:
-	
-	//UInt32				counter;
-	bool				lastLidState;
-	
-	//IOWorkLoop*			myWorkLoop;
-	IOWorkLoop*         _workLoop;
+    
+    //UInt32                counter;
+    bool                lastLidState;
+    
+    //IOWorkLoop*            myWorkLoop;
+    IOWorkLoop*         _workLoop;
 };
