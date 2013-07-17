@@ -55,7 +55,9 @@ To change this:
 
 ## TODO: ##
 * Actually implement settings
-* Add settings for IdleSleep
+* Allow sleep on temperature threshold
+* Allow sleep on battery threshold
+* Add settings for idle sleep
 * Insomnia.prefPane
 
 ## Credits & License ##
