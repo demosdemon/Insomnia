@@ -9,7 +9,7 @@
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
-	<string>fr.frostland.insomnia</string>
+	<string>co.pabu.kext.insomnia</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -39,7 +39,7 @@
 		</dict>
 	</dict>
 	<key>NSHumanReadableCopyright</key>
-	<string>Original by Michael Rossberg. Recompiled by Frost Land in 2013.</string>
+	<string>Original by Michael Rossberg. Recompiled by Frost Land in 2013. Rewritten by Joachim B. LeBlanc in 2013.</string>
 	<key>OSBundleLibraries</key>
 	<dict>
 		<key>com.apple.kpi.iokit</key>
