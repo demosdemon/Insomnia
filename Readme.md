@@ -12,8 +12,8 @@ xcodebuild -target Insomnia -configuration Release
 sudo cp -R build/Release/Insomnia.kext /System/Library/Extensions/
 sudo touch /System/Library/Extensions
 
-kextstat | grep fr.frostland.insomnia
-#   137    0 0xffffff7f8213e000 0x2000     0x2000     fr.frostland.insomnia (1.1.1) <4 3 1>
+kextstat | grep co.pabu.kext.insomnia
+#   137    0 0xffffff7f8213e000 0x2000     0x2000     co.pabu.kext.insomnia (1.1.1d1) <4 3 1>
 # If a line like above is printed out, you are done. Otherwise continue
 sudo kextload /System/Library/Extensions/Insomnia.kext
 ```
