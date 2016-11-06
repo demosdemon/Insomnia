@@ -37,13 +37,13 @@ class Insomnia : public IOService {
     OSDeclareDefaultStructors(Insomnia);
 
 public:
-    virtual bool init(OSDictionary * = 0);
-    virtual void free();
+    virtual bool init(OSDictionary * = 0) override;
+    virtual void free() override;
     
-    virtual bool start(IOService* provider);
-    virtual void stop(IOService* provider);
+    virtual bool start(IOService* provider) override;
+    virtual void stop(IOService* provider) override;
 
-    virtual IOReturn message(UInt32 type, IOService *provider, void *argument = 0);
+    virtual IOReturn message(UInt32 type, IOService *provider, void *argument = 0) override;
     virtual IOWorkLoop* getWorkLoop();
 
     bool send_event(UInt32 msg);
@@ -85,6 +85,6 @@ private:
                                                 UInt32 messageType, IOService * provider,
                                                 void * messageArgument, vm_size_t argSize);
 
-    virtual IOReturn setPowerState(unsigned long whichState, IOService * whatDevice);
+    virtual IOReturn setPowerState(unsigned long whichState, IOService * whatDevice) override;
 
 };
