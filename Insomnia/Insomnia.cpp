@@ -1,29 +1,29 @@
 /*
-    File:        Insomnia.cpp
-    Program:     Insomnia
-    Author:      Michael Roßberg/Alexey Manannikov/Dominik Wickenhauser/Andrew James
-    Description: Insomnia is a kext module to disable sleep on ClamshellClosed
- 
-    Copyright (C) 2009 Michael Roßberg, Alexey Manannikov, Dominik Wickenhauser, Andrew James
-        <https://code.google.com/p/insomnia-kext/>
-    Copyright (C) 2013 François Lamboley
-        <https://github.com/Frizlab/Insomnia>
-    Copyright (C) 2013 Joachim B. LeBlanc
-        <https://github.com/demosdemon/Insomnia>
+ File:        Insomnia.cpp
+ Program:     Insomnia
+ Author:      Michael Roßberg/Alexey Manannikov/Dominik Wickenhauser/Andrew James
+ Description: Insomnia is a kext module to disable sleep on ClamshellClosed
 
-    Insomnia is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
- 
-    Insomnia is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
- 
-    You should have received a copy of the GNU General Public License
-    along with Insomnia; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ Copyright (C) 2009 Michael Roßberg, Alexey Manannikov, Dominik Wickenhauser, Andrew James
+ <https://code.google.com/p/insomnia-kext/>
+ Copyright (C) 2013 François Lamboley
+ <https://github.com/Frizlab/Insomnia>
+ Copyright (C) 2013 Joachim B. LeBlanc
+ <https://github.com/demosdemon/Insomnia>
+
+ Insomnia is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 2 of the License, or
+ (at your option) any later version.
+
+ Insomnia is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with Insomnia; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #include <IOKit/IOLib.h>
@@ -49,90 +49,32 @@
 
 #include "Insomnia.h"
 
-#define CTLFLAG_ANYBODY_RW_NODE (CTLFLAG_ANYBODY|CTLFLAG_RW|CTLTYPE_NODE)
-#define CTLFLAG_ANYBODY_RW_INT (CTLFLAG_ANYBODY|CTLFLAG_RW|CTLTYPE_INT)
-
-#define INSOMNIA_SYSCTL_INT(name, desc, default, minval, maxval) \
-    static int name = default; \
-\
-    static int sysctl_##name SYSCTL_HANDLER_ARGS; \
-\
-    SYSCTL_PROC(_kern_insomnia, \
-                OID_AUTO, \
-                name, \
-                CTLFLAG_ANYBODY_RW_INT, \
-                &name, 0, \
-                &sysctl_##name, \
-                "I", desc); \
-\
-    static int sysctl_##name SYSCTL_HANDLER_ARGS { \
-        int error = sysctl_handle_int(oidp, oidp->oid_arg1, oidp->oid_arg2, req); \
-\
-        if (name < minval || name > maxval) \
-        return 1; \
-\
-        if (!error && req->newptr) { \
-            myinstance->states_changed(); \
-        } else if (req->newptr) { \
-            DLog("error with write"); \
-        } else { \
-\
-            SYSCTL_OUT(req, &name, sizeof(name)); \
-        } \
-\
-        return error; \
-    }
-
 #define super IOService
-
-void sysctl_register();
-void sysctl_unregister();
-
-#if DEBUG
-    static int debug = 1;
-#else
-    static int debug = 0;
-#endif
 
 #define DLog(fmt, ...) IOLog("%s:%d " fmt "\n", __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__)
 #if DEBUG
 #   define Log DLog
 #else
-#   define Log(fmt, ...) do { if (debug) DLog(fmt, ##__VA_ARGS__); } while(0)
+#   define Log(fmt, ...) do { if (settings.get_debug()) DLog(fmt, ##__VA_ARGS__); } while(0)
 #endif
 
 struct kern_ctl_reg ep_ctl; // Initialize control
 kern_ctl_ref kctlref;
 class Insomnia *myinstance;
 
-#pragma mark - Sysctl Insomnia Settings
-// After changing this list, make sure to update sysctl_register and sysctl_unregister!
-
-SYSCTL_DECL(_kern_insomnia);
-SYSCTL_NODE(_kern, OID_AUTO, insomnia, CTLFLAG_RW, 0, "Insomnia Settings");
-
-INSOMNIA_SYSCTL_INT(lidsleep, "Override power states", -1, -1, 1);
-INSOMNIA_SYSCTL_INT(ac_state, "Lid sleep for AC", 1, 0, 1);
-INSOMNIA_SYSCTL_INT(battery_state, "Lid sleep for battery", 0, 0, 1);
-
-// debug is just a regular sysctl managed int... we don't need to be notified when it changes
-SYSCTL_INT(_kern_insomnia, OID_AUTO, debug, (CTLFLAG_ANYBODY|CTLFLAG_RW), &debug, debug, "");
-
 #pragma mark - Init and Free
-
 OSDefineMetaClassAndStructors(Insomnia, IOService);
 
 bool Insomnia::init(OSDictionary* properties) {
     DLog("");
-    
+
     if (super::init(properties) == false) {
         DLog("super::init failed");
         return false;
     }
 
     myinstance = this;
-
-    sysctl_register();
+    settings.initialize();
 
     return true;
 }
@@ -140,15 +82,13 @@ bool Insomnia::init(OSDictionary* properties) {
 void Insomnia::free() {
     Log("");
 
-    sysctl_unregister();
-    
     super::free();
 }
 
 IOWorkLoop* Insomnia::getWorkLoop() {
     if (!_work_loop)
         _work_loop = IOWorkLoop::workLoop();
-    
+
     return _work_loop;
 }
 
@@ -190,70 +130,68 @@ void Insomnia::stop(IOService* provider) {
 #pragma mark - Instance operations
 
 void Insomnia::states_changed() {
+    int lidsleep = settings.get_lidsleep(),
+    ac_state = settings.get_ac_state(),
+    battery_state = settings.get_battery_state(),
+    battery_threshold = settings.get_battery_threshold(),
+    cpu_temp_state = settings.get_cpu_temp_state(),
+    cpu_temp_threshold = settings.get_cpu_threshold(),
+    battery_percent = battery_percent_remaining(),
+    cpu_temperature = 0;
+
+    bool isOnAC = is_on_AC();
+
     Log("\n"
-        "lidsleep == %d\n"
-        "ac_state == %d\n"
-        "battery_state == %d\n"
-        "battery_percent_remaining() == %d\n"
-        "is_on_AC() == %s",
-        lidsleep, ac_state, battery_state, battery_percent_remaining(),
-        is_on_AC() ? "true" : "false");
+        "lidsleep = %d\n"
+        "ac_state = %d\n"
+        "battery_state = %d"
+        "battery_threshold = %d\n"
+        "cpu_temp_state = %d\n"
+        "cpu_temp_threshold = %d\n"
+        "battery_percent = %d\n"
+        "cpu_temperature = %d\n"
+        "isOnAC = %s",
+        lidsleep, ac_state, battery_state, battery_threshold, cpu_temp_state, cpu_temp_threshold,
+        battery_percent, cpu_temperature, isOnAC ? "true" : "false");
 
-//    if (battery_percent_remaining() >= bat_threshold || cpu_temp < temp_threshold) {
-
-    if (lidsleep == 1) {
-        _lid_sleep_disabled = true;
-    } else if (lidsleep == 0) {
-        _lid_sleep_disabled = false;
+#define enableSleep(fmt, ...) Log(fmt, ##__VA_ARGS__); changeSleepState(true)
+#define disableSleep(fmt, ...) Log(fmt, ##__VA_ARGS__); changeSleepState(false)
+    if (!lidsleep) {
+        enableSleep("Enabling sleep: lidsleep is disabled");
     } else {
-        if ((is_on_AC() && ac_state) || (!is_on_AC() && battery_state))
-            _lid_sleep_disabled = true;
-        else
-            _lid_sleep_disabled = false;
-    }
-
-//    if (idlesleep == 1) {
-//        _idle_sleep_disabled = true;
-//    } else if (idlesleep == 0) {
-//        _idle_sleep_disabled = false;
-//    } else {
-//        if ((is_on_AC() && ac_idle_state) || (!is_on_AC() && battery_idle_state))
-//            _idle_sleep_disabled = true;
-//        else
-//            _idle_sleep_disabled = false;
-//    }
-
-//    } else {
-//        _lid_sleep_disabled = true;
-//        _idle_sleep_disabled = true;
-//    }
-
-    if (_lid_sleep_disabled) {
-        disable_lid_sleep();
-    } else {
-        enable_lid_sleep();
-        if (!_last_lid_state) {
-            DLog("Sleeping because lid was already closed and now we don't want to be awake\n"
-                 "Probably because we got unplugged or the battery dropped too low or the CPU"
-                 " got too hot");
-            send_event(kIOPMSleepNow);
+        if (ac_state && isOnAC) {
+            disableSleep("Disabling sleep: on AC power");
+        }
+        if (battery_state == -1 && !isOnAC) {
+            enableSleep("Enabling sleep: on battery");
+        } else if (battery_state == 0 && !isOnAC) {
+            if (battery_percent <= battery_threshold) {
+                enableSleep("Enabling sleep: battery (%d%%) below threshold (%d%%)",
+                            battery_percent, battery_threshold);
+            } else {
+                disableSleep("Disabling sleep: sleep on battery disabled (battery threshold enabled)");
+            }
+        } else if (battery_state == 1) {
+            disableSleep("Disabling sleep: sleep on battery disabled");
+        }
+        if (cpu_temp_state && cpu_temperature >= cpu_temp_threshold) {
+            enableSleep("Enabling sleep: cpu temperature (%d) exceeded threshold (%d)",
+                        cpu_temperature, cpu_temp_threshold);
         }
     }
+#undef enableSleep
+#undef disableSleep
 
-//    if (_idle_sleep_disabled) {
-//        disable_idle_sleep();
-//    } else {
-//        enable_idle_sleep();
-//    }
+    commitSleepState();
 }
 
 /* Send power messages to rootDomain */
 bool Insomnia::send_event(UInt32 msg) {
     IOPMrootDomain *root = NULL;
     IOReturn        ret=kIOReturnSuccess;
-    
+
     DLog("");
-    
+
     root = getPMRootDomain();
     if (!root) {
         DLog("Fatal error could not get RootDomain.");
@@ -261,23 +199,23 @@ bool Insomnia::send_event(UInt32 msg) {
     }
 
     ret = root->receivePowerNotification(msg);
-    
+
     Log("root returns %d", ret);
-    
+
     if(ret!=kIOReturnSuccess)
     {
         DLog("Error sending event: %d", ret);
     }
     else
         Log("Message sent to root");
-    
+
     return true;
 }
 
 
 /* kIOPMMessageClamshallStateChange Notification */
 IOReturn Insomnia::message(UInt32 type, IOService * provider, void * argument) {
-    
+
     if (type == kIOPMMessageClamshellStateChange) {
         bool state = (((long)argument) & kClamshellStateBit);
         clamshell_state_changed(state);
@@ -286,35 +224,35 @@ IOReturn Insomnia::message(UInt32 type, IOService * provider, void * argument) {
             send_event(kIOPMClamshellOpened);
         // You know, I'm not even sure if this is necessary...
         // I think it causes a weird dispatch loop
-//        
-//        /* If lid was opened */
-//        if ( ( argument && kClamshellStateBit) & (!lastLidState)) {
-//            Log("kClamshellStateBit set - lid was opened");
-//            lastLidState = true;
-//            
-//            Insomnia::send_event( kIOPMClamshellOpened);
-//            
-//            /* If lastLidState is true - lid closed */
-//        } else if (lastLidState) {
-//            Log("kClamshellStateBit not set - lid was closed");
-//            lastLidState = false;
-//            
-//            // - send kIOPMDisableClamshell | kIOPMPreventSleep here?
-//            if(origstate==1)
-//                Insomnia::send_event(kIOPMDisableClamshell | kIOPMPreventSleep);
-//        }
-//        
-//        /*        detection of system sleep probably not needed ...
-//         
-//        if ( argument && kClamshellSleepBit) {
-//            Log("kClamshellSleepBit set - now awake");
-//        } else {
-//            Log("kClamshellSleepBit not set - now sleeping");
-//        }
-//        */
-//        
+        //
+        //        /* If lid was opened */
+        //        if ( ( argument && kClamshellStateBit) & (!lastLidState)) {
+        //            Log("kClamshellStateBit set - lid was opened");
+        //            lastLidState = true;
+        //
+        //            Insomnia::send_event( kIOPMClamshellOpened);
+        //
+        //            /* If lastLidState is true - lid closed */
+        //        } else if (lastLidState) {
+        //            Log("kClamshellStateBit not set - lid was closed");
+        //            lastLidState = false;
+        //
+        //            // - send kIOPMDisableClamshell | kIOPMPreventSleep here?
+        //            if(origstate==1)
+        //                Insomnia::send_event(kIOPMDisableClamshell | kIOPMPreventSleep);
+        //        }
+        //
+        //        /*        detection of system sleep probably not needed ...
+        //
+        //        if ( argument && kClamshellSleepBit) {
+        //            Log("kClamshellSleepBit set - now awake");
+        //        } else {
+        //            Log("kClamshellSleepBit not set - now sleeping");
+        //        }
+        //        */
+        //
     }
-    
+
     return super::message(type, provider, argument);
 }
 
@@ -410,7 +348,7 @@ int Insomnia::battery_percent_remaining() {
 
         if (percent < 0 || percent > 100)
             percent = -1;
-        
+
         return percent;
     }
 
@@ -435,20 +373,6 @@ IOReturn Insomnia::setPowerState(__unused unsigned long whichState,
     return IOPMAckImplied;
 }
 
-# pragma mark - sysctl setup
-
-void sysctl_register() {
-    sysctl_register_oid(&sysctl__kern_insomnia);
-    sysctl_register_oid(&sysctl__kern_insomnia_lidsleep);
-    sysctl_register_oid(&sysctl__kern_insomnia_ac_state);
-    sysctl_register_oid(&sysctl__kern_insomnia_battery_state);
-    sysctl_register_oid(&sysctl__kern_insomnia_debug);
-}
-
-void sysctl_unregister() {
-    sysctl_unregister_oid(&sysctl__kern_insomnia_debug);
-    sysctl_unregister_oid(&sysctl__kern_insomnia_battery_state);
-    sysctl_unregister_oid(&sysctl__kern_insomnia_ac_state);
-    sysctl_unregister_oid(&sysctl__kern_insomnia_lidsleep);
-    sysctl_unregister_oid(&sysctl__kern_insomnia);
+bool Insomnia::property_changed(const struct InsomniaSettings::PropertyChangeEvent * event) {
+    return true;
 }
