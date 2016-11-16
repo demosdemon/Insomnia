@@ -1,6 +1,8 @@
 #ifndef LINKEDLIST_H
 #define LINKEDLIST_H
 
+#include <machine/types.h>
+
 template <class T>
 struct Node
 {
@@ -15,7 +17,7 @@ class LinkedList
 public:
     class Iterator;
 
-    LinkedList() { first = last = 0; }
+    LinkedList() { first = last = NULL; }
     ~LinkedList() { clear(); }
 
     void insertAtBack(T valueToInsert)
@@ -23,7 +25,7 @@ public:
         Node<T> *tmp = new Node<T>();
         tmp->val = valueToInsert;
 
-        if (!last) {
+        if (last == NULL) {
             first = last = tmp;
         } else {
             last->next = tmp;
@@ -37,7 +39,7 @@ public:
         Node<T> * newNode = new Node<T>();
         newNode->val = valueToInsert;
 
-        if(!first)
+        if(first == NULL)
         {
             first = last = newNode;
         }
@@ -56,7 +58,7 @@ public:
             return node;
         }
 
-        if (node.currentNode == 0) {
+        if (node.currentNode == NULL) {
             insertAtBack(valueToInsert);
             return end();
         }
@@ -77,7 +79,7 @@ public:
             return node;
         }
 
-        if (node.currentNode == 0) {
+        if (node.currentNode == NULL) {
             insertAtFront(valueToInsert);
             return begin();
         }
@@ -98,13 +100,13 @@ public:
 
         if (first == last) {
             delete(first);
-            first = last = 0;
+            first = last = NULL;
             return true;
         }
 
         Node<T> *tmp = first;
         first = tmp->next;
-        first->prev = 0;
+        first->prev = NULL;
 
         delete(tmp);
         return true;
@@ -117,20 +119,20 @@ public:
 
         if (first == last) {
             delete(last);
-            first = last = 0;
+            first = last = NULL;
             return true;
         }
 
         Node<T> *tmp = last;
         last = tmp->prev;
-        last->next = 0;
+        last->next = NULL;
 
         delete(tmp);
         return true;
     }
 
     Iterator removeAt(Iterator& node) {
-        if (node.currentNode == 0)
+        if (node.currentNode == NULL)
             return node;
 
         Node<T> * tmp = node.currentNode;
@@ -155,7 +157,7 @@ public:
 
     bool isEmpty()
     {
-        return first == 0 && last == 0;
+        return first == NULL && last == NULL;
     }
 
     int size()
@@ -171,7 +173,7 @@ public:
     {
         while(removeFromFront())
         {
-
+            // noop
         }
     }
 

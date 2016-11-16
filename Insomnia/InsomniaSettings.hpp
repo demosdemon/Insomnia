@@ -65,31 +65,37 @@ public:
 #else
     PROPERTY(debug, 1, 0, 1);
 #endif
+
     /*! kern.insomnia.lidsleep
      0 => default, does nothing: allows system to sleep when the lid is closed
      1 => does not allow the system to sleep when the lid is closed (except where configured)
      */
     PROPERTY(lidsleep, 0, 0, 1);
+
     /*! kern.insomnia.ac_state
      0 => sleep when connect to ac power
      1 => default, do not sleep when connect to ac power
      */
     PROPERTY(ac_state, 1, 0, 1);
+
     /*! kern.insomnia.battery_state
      -1 => default, sleep when on battery power
      0 => do not sleep when on battery, but sleep when battery drops below threshold
      1 => do not sleep when on battery power
      */
     PROPERTY(battery_state, 0, -1, 1);
+
     /*! kern.insomnia.battery_threshold
      default => 30
      */
     PROPERTY(battery_threshold, 30, 0, 100);
+
     /*! kern.insomnia.cpu_temp_state
      0 => do not sleep when cpu exceeds temperature threshold
      1 => default, sleep when cpu exceeds temperature threshold
      */
     PROPERTY(cpu_temp_state, 1, 0, 1);
+
     /*! kern.insomnia.cpu_threshold
      default => 80 degrees celsius
      max => 105 degrees celsius

@@ -10,6 +10,8 @@
 		5D02FD2F1DCEB9FC000E0A91 /* InsomniaSettings.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5D02FD2D1DCEB9FC000E0A91 /* InsomniaSettings.cpp */; };
 		5D0E77CA17970604000A74CB /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = 5D0E77C717963019000A74CB /* LICENSE */; };
 		5D0E77CB17970613000A74CB /* Readme.md in Resources */ = {isa = PBXBuildFile; fileRef = 5D0E77C817963357000A74CB /* Readme.md */; };
+		5DFAB60E1DD27ADA00BD6528 /* SMC.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5DFAB60C1DD27ADA00BD6528 /* SMC.cpp */; };
+		5DFAB60F1DD27ADA00BD6528 /* SMC.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5DFAB60D1DD27ADA00BD6528 /* SMC.hpp */; };
 		7B252D7E17369F0A004CDB57 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7B252D7C17369F0A004CDB57 /* InfoPlist.strings */; };
 		7B252D8117369F0A004CDB57 /* Insomnia.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B252D8017369F0A004CDB57 /* Insomnia.cpp */; };
 /* End PBXBuildFile section */
@@ -20,6 +22,9 @@
 		5D0E77C717963019000A74CB /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = SOURCE_ROOT; };
 		5D0E77C817963357000A74CB /* Readme.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = Readme.md; sourceTree = SOURCE_ROOT; };
 		5DFAB6081DD1918B00BD6528 /* LinkedList.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = LinkedList.hpp; sourceTree = "<group>"; };
+		5DFAB60C1DD27ADA00BD6528 /* SMC.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = SMC.cpp; sourceTree = "<group>"; };
+		5DFAB60D1DD27ADA00BD6528 /* SMC.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = SMC.hpp; sourceTree = "<group>"; };
+		5DFAB6101DD3784900BD6528 /* smc.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = smc.h; sourceTree = "<group>"; };
 		7B252D7417369F0A004CDB57 /* Insomnia.kext */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Insomnia.kext; sourceTree = BUILT_PRODUCTS_DIR; };
 		7B252D7817369F0A004CDB57 /* Kernel.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Kernel.framework; path = System/Library/Frameworks/Kernel.framework; sourceTree = SDKROOT; };
 		7B252D7B17369F0A004CDB57 /* Insomnia-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Insomnia-Info.plist"; sourceTree = "<group>"; };
@@ -81,7 +86,10 @@
 				5D02FD2D1DCEB9FC000E0A91 /* InsomniaSettings.cpp */,
 				5D02FD2E1DCEB9FC000E0A91 /* InsomniaSettings.hpp */,
 				5DFAB6081DD1918B00BD6528 /* LinkedList.hpp */,
+				5DFAB60C1DD27ADA00BD6528 /* SMC.cpp */,
+				5DFAB60D1DD27ADA00BD6528 /* SMC.hpp */,
 				7B252D7A17369F0A004CDB57 /* Supporting Files */,
+				5DFAB6101DD3784900BD6528 /* smc.h */,
 			);
 			path = Insomnia;
 			sourceTree = "<group>";
@@ -105,6 +113,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5DFAB60F1DD27ADA00BD6528 /* SMC.hpp in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -190,6 +199,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5DFAB60E1DD27ADA00BD6528 /* SMC.cpp in Sources */,
 				5D02FD2F1DCEB9FC000E0A91 /* InsomniaSettings.cpp in Sources */,
 				7B252D8117369F0A004CDB57 /* Insomnia.cpp in Sources */,
 			);
